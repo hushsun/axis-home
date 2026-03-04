@@ -1,1 +1,27 @@
+:root {
+  /* 适配刘海屏，防止顶部内容被遮挡 */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+body {
+  /* 禁止页面整体上下滑动产生的“橡皮筋回弹”效果 */
+  overscroll-behavior-y: none;
+  
+  /* 禁止用户长按选中文本（除非是输入框），防止误触 */
+  -webkit-user-select: none;
+  user-select: none;
+
+  /* 移除 iOS 点击链接时的灰色高亮，让反馈更干脆 */
+  -webkit-tap-highlight-color: transparent;
+  
+  /* 固定视口，防止双击缩放 */
+  touch-action: manipulation;
+}
+
+/* 确保输入框依然可以正常输入和选中 */
+input, textarea {
+  -webkit-user-select: auto;
+  user-select: auto;
+}
 @import "tailwindcss";
