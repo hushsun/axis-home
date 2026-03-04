@@ -1,9 +1,4 @@
-/* 1. 必须排在最开头 */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
-/* 或者如果你是用 @import 方式写的：
 @import "tailwindcss"; 
 */
 
