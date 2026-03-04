@@ -1,0 +1,11 @@
+console.log("我的数据库地址是：", import.meta.env.VITE_SUPABASE_URL);
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import App from './App.jsx'
+
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)
