@@ -1,8 +1,6 @@
+@import "tailwindcss";
 
-@import "tailwindcss"; 
-*/
-
-/* 2. 之后再放我们的自定义优化代码 */
+/* 适配 iOS 和沉浸式体验的自定义代码 */
 :root {
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
@@ -14,6 +12,8 @@ body {
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  /* 确保有背景色，否则白底黑线看起来很简陋 */
+  @apply bg-slate-950 text-slate-50; 
 }
 
 input, textarea {
