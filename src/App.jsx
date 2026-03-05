@@ -106,7 +106,7 @@ const BudgetPieChart = ({ categories, onSelect }) => {
 };
 
 // ==========================================
-// 3. 初始预设数据
+// 3. 初始数据
 // ==========================================
 const DEFAULT_SPACES = [
   { id: 's_entrance', name: '玄关', icon: '👟' },
@@ -354,6 +354,18 @@ export default function App() {
     setEditModal(null);
   };
 
+  const confirmBudget = (agree) => {
+    setTotalBudgetState(prev => {
+      if (agree && prev.proposal) return { value: prev.proposal.value, status: 'locked', proposal: null };
+      return { ...prev, status: 'locked', proposal: null };
+    });
+  };
+
+  const deleteCategory = (id) => {
+    setCategories(prev => prev.filter(c => c.id !== id));
+    if (activeCategoryId === id) setActiveCategoryId(null);
+  };
+
   const deleteSpace = (id) => {
     if (spaces.length <= 1) {
       alert("请至少保留一个空间维度！");
@@ -364,14 +376,42 @@ export default function App() {
     if (activeSpace.id === id) setActiveSpace(updatedSpaces[0]);
     if (visualActiveSpaceId === id) setVisualActiveSpaceId(updatedSpaces[0].id);
   };
+  
+  const deleteTimelineNode = (id) => {
+    setTimeline(prev => prev.filter(t => t.id !== id));
+  };
 
+  const handleAddSpaceSubmit = (e) => {
+    e.preventDefault();
+    if (!newSpaceName.trim()) return;
+    const newSpace = { id: `s_${Date.now()}`, name: newSpaceName.trim(), icon: '🏠' };
+    setSpaces([...spaces, newSpace]);
+    setActiveSpace(newSpace);
+    setNewSpaceName('');
+    setShowAddSpaceModal(false);
+  };
+
+  const toggleTimelineNodeDone = (id) => {
+    setTimeline(prev => prev.map(n => n.id === id ? { ...n, done: !n.done } : n));
+  };
+
+  // --- 视觉模块逻辑 (修复删除 Bug：阻止冒泡 + 深拷贝) ---
   const handleIntentUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    const currentIntents = intentImages[visualActiveSpaceId] || [];
+    if (currentIntents.length >= 5) return;
     setIntentImages(prev => ({
-      ...prev, [visualActiveSpaceId]: [...(prev[visualActiveSpaceId] || []), { id: Date.now().toString(), url: URL.createObjectURL(file) }]
+      ...prev, [visualActiveSpaceId]: [...(prev[visualActiveSpaceId] || []), { id: (Date.now() + Math.random()).toString(), url: URL.createObjectURL(file) }]
     }));
     e.target.value = null; 
+  };
+
+  const handleDeleteIntent = (imageId) => {
+    setIntentImages(prev => {
+      const newList = (prev[visualActiveSpaceId] || []).filter(img => img.id !== imageId);
+      return { ...prev, [visualActiveSpaceId]: newList };
+    });
   };
 
   const handleMaterialImageUpload = (e) => {
@@ -384,11 +424,16 @@ export default function App() {
   const submitNewMaterial = (e) => {
     e.preventDefault();
     if (!newMaterial.url || !newMaterial.title.trim()) return;
-    setMaterials([{ id: Date.now().toString(), ...newMaterial }, ...materials]);
+    setMaterials([{ id: (Date.now() + Math.random()).toString(), ...newMaterial }, ...materials]);
     setShowMaterialModal(false);
     setNewMaterial({ title: '', remark: '', url: '' });
   };
 
+  const deleteMaterial = (id) => {
+    setMaterials(prev => prev.filter(m => m.id !== id));
+  };
+
+  // --- 交互逻辑 ---
   const handleTouchStart = (e) => { touchStartY.current = e.touches[0].clientY; setSwipeY(0); };
   const handleTouchMove = (e) => setSwipeY(e.touches[0].clientY - touchStartY.current);
   const handleTouchEnd = () => {
@@ -400,7 +445,7 @@ export default function App() {
     const files = Array.from(e.target.files);
     if (!files.length) return;
     if (newPost.images.length + files.length > 9) { alert('最多只能上传9张图片！'); return; }
-    const newImages = files.map(file => ({ id: Date.now() + Math.random().toString(), url: URL.createObjectURL(file) }));
+    const newImages = files.map(file => ({ id: (Date.now() + Math.random()).toString(), url: URL.createObjectURL(file) }));
     setNewPost(prev => ({ ...prev, images: [...prev.images, ...newImages] }));
     e.target.value = null;
   };
@@ -504,8 +549,8 @@ export default function App() {
           {activeTab === 'visuals' && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6 pb-20">
               <div className="flex bg-slate-200/60 p-1.5 rounded-full mb-6 relative shadow-inner"><button onClick={() => setVisualsTab('intent')} className={`flex-1 py-2.5 text-[11px] font-black uppercase tracking-widest rounded-full transition-all relative z-10 ${visualsTab === 'intent' ? 'text-slate-900 shadow-sm bg-white' : 'text-slate-500 hover:text-slate-700'}`}>空间意向</button><button onClick={() => setVisualsTab('material')} className={`flex-1 py-2.5 text-[11px] font-black uppercase tracking-widest rounded-full transition-all relative z-10 ${visualsTab === 'material' ? 'text-slate-900 shadow-sm bg-white' : 'text-slate-500 hover:text-slate-700'}`}>全域材料</button></div>
-              {visualsTab === 'intent' && (<div className="space-y-6 animate-in slide-in-from-left-4"><div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide -mx-5 px-5">{spaces.map(s => (<button key={s.id} onClick={() => setVisualActiveSpaceId(s.id)} className={`flex-shrink-0 px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all border ${visualActiveSpaceId === s.id ? 'bg-slate-900 text-white border-slate-900 shadow-lg' : 'bg-white text-slate-400 border-slate-200'}`}>{s.name}</button>))}</div><div className="flex justify-between items-end mb-4 px-1"><div><h3 className="text-xl font-black italic text-slate-900 leading-none">{spaces.find(s=>s.id === visualActiveSpaceId)?.name} 意向定调</h3><p className="text-[10px] text-slate-400 font-bold mt-2 uppercase tracking-widest">Max 5 Images Per Space</p></div><button onClick={() => setIsEditingIntents(!isEditingIntents)} className={`p-2 rounded-xl transition-all ${isEditingIntents ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-400 hover:text-slate-900'}`}><Settings2 size={16} /></button></div><div className="flex flex-col gap-4">{(intentImages[visualActiveSpaceId] || []).map((img) => (<div key={img.id} className="relative rounded-[24px] overflow-hidden shadow-md group bg-slate-100 w-full"><img src={img.url} alt="Intent" className="w-full h-auto object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => !isEditingIntents && setPreviewImage(img.url)} />{isEditingIntents && <div className="absolute inset-0 bg-black/40 flex items-center justify-center animate-in fade-in"><button onClick={() => handleDeleteIntent(img.id)} className="p-4 bg-red-500 text-white rounded-full shadow-xl active:scale-90 transition-transform"><Trash2 size={24}/></button></div>}</div>))}</div>{(() => { const currentCount = (intentImages[visualActiveSpaceId] || []).length; const isFull = currentCount >= 5; return (<div className="mt-6"><input type="file" accept="image/*" ref={intentFileInputRef} onChange={handleIntentUpload} className="hidden" /><button onClick={() => !isFull && !isEditingIntents && intentFileInputRef.current.click()} disabled={isFull || isEditingIntents} className={`w-full py-6 rounded-[24px] border-2 border-dashed flex flex-col items-center justify-center gap-3 transition-all ${isFull ? 'bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed' : 'bg-white border-slate-300 text-slate-400 hover:border-slate-900 active:scale-95'}`}>{isFull ? <><AlertTriangle size={24} className="text-amber-500" /><span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">精简意向以保证空间调性的一致性</span></> : <><UploadCloud size={28} /><span className="text-xs font-black uppercase tracking-widest">Upload Key Vision ({currentCount}/5)</span></>}</button></div>); })()}</div>)}
-              {visualsTab === 'material' && (<div className="space-y-6 animate-in slide-in-from-right-4"><div className="flex justify-between items-center mb-6 px-1"><div><h3 className="text-xl font-black italic text-slate-900 leading-none">全局材料库</h3><p className="text-[10px] text-slate-400 font-bold mt-2 uppercase tracking-widest">Material & Texture Audit</p></div><button onClick={() => setShowMaterialModal(true)} className="w-10 h-10 bg-slate-900 text-white rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform"><Plus size={18}/></button></div>{materials.length === 0 && <div className="py-20 text-center text-slate-300 font-black italic text-sm">暂无材料入库...</div>}<div className="columns-2 gap-3 space-y-3">{materials.map(m => (<div key={m.id} className="break-inside-avoid bg-white p-2 rounded-[24px] shadow-sm border border-slate-100 group relative"><div className="relative rounded-[16px] overflow-hidden cursor-pointer" onClick={() => setPreviewImage(m.url)}><img src={m.url} alt={m.title} className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-500" /><div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-colors"><Maximize2 className="text-white drop-shadow-md" size={24} /></div></div><div className="pt-3 pb-1 px-2"><div className="flex justify-between items-start gap-2"><h4 className="font-black text-sm text-slate-900 leading-snug">{m.title}</h4><button onClick={() => deleteMaterial(m.id)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={14}/></button></div>{m.remark && <p className="text-[10px] text-slate-500 mt-1.5 font-bold leading-relaxed">{m.remark}</p>}</div></div>))}</div></div>)}
+              {visualsTab === 'intent' && (<div className="space-y-6 animate-in slide-in-from-left-4"><div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide -mx-5 px-5">{spaces.map(s => (<button key={s.id} onClick={() => setVisualActiveSpaceId(s.id)} className={`flex-shrink-0 px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all border ${visualActiveSpaceId === s.id ? 'bg-slate-900 text-white border-slate-900 shadow-lg' : 'bg-white text-slate-400 border-slate-200'}`}>{s.name}</button>))}</div><div className="flex justify-between items-end mb-4 px-1"><div><h3 className="text-xl font-black italic text-slate-900 leading-none">{spaces.find(s=>s.id === visualActiveSpaceId)?.name} 意向定调</h3><p className="text-[10px] text-slate-400 font-bold mt-2 uppercase tracking-widest">Max 5 Images Per Space</p></div><button onClick={() => setIsEditingIntents(!isEditingIntents)} className={`p-2 rounded-xl transition-all ${isEditingIntents ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-400 hover:text-slate-900'}`}><Settings2 size={16} /></button></div><div className="flex flex-col gap-4">{(intentImages[visualActiveSpaceId] || []).map((img) => (<div key={img.id} className="relative rounded-[24px] overflow-hidden shadow-md group bg-slate-100 w-full"><img src={img.url} alt="Intent" className="w-full h-auto object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => !isEditingIntents && setPreviewImage(img.url)} />{isEditingIntents && <div className="absolute inset-0 bg-black/40 flex items-center justify-center animate-in fade-in" onClick={e => e.stopPropagation()}><button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteIntent(img.id); }} className="p-4 bg-red-500 text-white rounded-full shadow-xl active:scale-90 transition-transform relative z-20"><Trash2 size={24}/></button></div>}</div>))}</div>{(() => { const currentCount = (intentImages[visualActiveSpaceId] || []).length; const isFull = currentCount >= 5; return (<div className="mt-6"><input type="file" accept="image/*" ref={intentFileInputRef} onChange={handleIntentUpload} className="hidden" /><button onClick={() => !isFull && !isEditingIntents && intentFileInputRef.current.click()} disabled={isFull || isEditingIntents} className={`w-full py-6 rounded-[24px] border-2 border-dashed flex flex-col items-center justify-center gap-3 transition-all ${isFull ? 'bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed' : 'bg-white border-slate-300 text-slate-400 hover:border-slate-900 active:scale-95'}`}>{isFull ? <><AlertTriangle size={24} className="text-amber-500" /><span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">精简意向以保证空间调性的一致性</span></> : <><UploadCloud size={28} /><span className="text-xs font-black uppercase tracking-widest">Upload Key Vision ({currentCount}/5)</span></>}</button></div>); })()}</div>)}
+              {visualsTab === 'material' && (<div className="space-y-6 animate-in slide-in-from-right-4"><div className="flex justify-between items-center mb-6 px-1"><div><h3 className="text-xl font-black italic text-slate-900 leading-none">全局材料库</h3><p className="text-[10px] text-slate-400 font-bold mt-2 uppercase tracking-widest">Material & Texture Audit</p></div><button onClick={() => setShowMaterialModal(true)} className="w-10 h-10 bg-slate-900 text-white rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform"><Plus size={18}/></button></div>{materials.length === 0 && <div className="py-20 text-center text-slate-300 font-black italic text-sm">暂无材料入库...</div>}<div className="columns-2 gap-3 space-y-3">{materials.map(m => (<div key={m.id} className="break-inside-avoid bg-white p-2 rounded-[24px] shadow-sm border border-slate-100 group relative"><div className="relative rounded-[16px] overflow-hidden cursor-pointer" onClick={() => setPreviewImage(m.url)}><img src={m.url} alt={m.title} className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-500" /><div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-colors"><Maximize2 className="text-white drop-shadow-md" size={24} /></div></div><div className="pt-3 pb-1 px-2"><div className="flex justify-between items-start gap-2"><h4 className="font-black text-sm text-slate-900 leading-snug">{m.title}</h4><button type="button" onClick={(e) => { e.stopPropagation(); deleteMaterial(m.id); }} className="text-slate-300 hover:text-red-500 transition-colors p-1 relative z-10"><Trash2 size={14}/></button></div>{m.remark && <p className="text-[10px] text-slate-500 mt-1.5 font-bold leading-relaxed">{m.remark}</p>}</div></div>))}</div></div>)}
             </div>
           )}
 
@@ -519,6 +564,7 @@ export default function App() {
           )}
         </main>
 
+        {/* 悬浮输入框 */}
         {activeTab === 'spaces' && !isManagingSpaces && (
           <div className="absolute bottom-[80px] left-0 right-0 z-40 bg-gradient-to-t from-slate-100 via-slate-100/90 to-transparent pt-6 pb-4 px-5 pointer-events-none">
             <form onSubmit={addRequirement} className="bg-white/95 backdrop-blur-xl p-2 rounded-[32px] border border-slate-200 shadow-xl flex gap-2 pointer-events-auto">
@@ -528,6 +574,7 @@ export default function App() {
           </div>
         )}
 
+        {/* FAB 发帖 */}
         {activeTab === 'feed' && (<button onClick={() => setShowPostModal(true)} className="absolute bottom-[100px] right-6 w-14 h-14 bg-slate-900 text-white rounded-full shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-40"><Plus size={28} /></button>)}
 
         <nav className="absolute bottom-0 w-full bg-white/95 border-t border-slate-100 flex h-[80px] px-2 pb-4 z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
@@ -535,6 +582,8 @@ export default function App() {
             <button key={t.id} onClick={() => { setActiveTab(t.id); setIsManagingSpaces(false); setIsManagingCategories(false); setIsManagingTimeline(false); }} className={`flex-1 flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${activeTab === t.id ? 'text-slate-900 scale-105' : 'text-slate-400 hover:text-slate-600'}`}><t.icon size={20} className={activeTab === t.id ? 'stroke-[3px]' : 'stroke-2'} /><span className={`text-[9px] font-black uppercase tracking-widest ${activeTab === t.id ? 'opacity-100' : 'opacity-40'}`}>{t.label}</span></button>
           ))}
         </nav>
+
+        {/* --- 弹窗组件群 --- */}
 
         {showPostModal && (
           <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[200] flex items-center justify-center p-4" onClick={() => setShowPostModal(false)}>
@@ -544,7 +593,7 @@ export default function App() {
                    <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">动态标签 TAG</label><div className="flex flex-wrap gap-2">{['设计', '现场', '灵感', '感触'].map(t => (<button key={t} type="button" onClick={() => setNewPost({...newPost, tag: t})} className={`px-3 py-1.5 rounded-lg text-xs font-black transition-colors ${newPost.tag === t ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}>{t}</button>))}</div></div>
                    <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">标题 HEADER</label><input type="text" value={newPost.header} onChange={e => setNewPost({...newPost, header: e.target.value})} placeholder="一句话概括..." className="w-full bg-slate-50 rounded-xl p-3 text-[16px] font-bold outline-none focus:ring-2 focus:ring-slate-900" /></div>
                    <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">详情 DESC</label><textarea value={newPost.description} onChange={e => setNewPost({...newPost, description: e.target.value})} placeholder="记录现场情况..." className="w-full bg-slate-50 rounded-xl p-3 text-[16px] font-bold h-24 resize-none focus:ring-2 focus:ring-slate-900 outline-none" /></div>
-                   <div className="space-y-2"><div className="flex justify-between items-center"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">影像 MEDIA</label><span className="text-[10px] font-bold text-slate-400">{newPost.images.length}/9</span></div><div className="grid grid-cols-4 gap-2">{newPost.images.map(img => (<div key={img.id} className="relative aspect-square rounded-lg overflow-hidden"><img src={img.url} className="w-full h-full object-cover" alt="preview" /><button type="button" onClick={() => setNewPost({...newPost, images: newPost.images.filter(i=>i.id !== img.id)})} className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 hover:opacity-100"><Trash2 size={16}/></button></div>))}{newPost.images.length < 9 && <div onClick={() => postFileInputRef.current.click()} className="aspect-square rounded-lg border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 cursor-pointer"><Plus size={20} /></div>}<input type="file" multiple accept="image/*" ref={postFileInputRef} onChange={handlePostImageUpload} className="hidden" /></div></div>
+                   <div className="space-y-2"><div className="flex justify-between items-center"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">影像 MEDIA</label><span className="text-[10px] font-bold text-slate-400">{newPost.images.length}/9</span></div><div className="grid grid-cols-4 gap-2">{newPost.images.map(img => (<div key={img.id} className="relative aspect-square rounded-lg overflow-hidden"><img src={img.url} className="w-full h-full object-cover" alt="preview" /><button type="button" onClick={() => setNewPost({...newPost, images: newPost.images.filter(i=>i.id !== img.id)})} className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"><Trash2 size={16}/></button></div>))}{newPost.images.length < 9 && <div onClick={() => postFileInputRef.current.click()} className="aspect-square rounded-lg border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 cursor-pointer"><Plus size={20} /></div>}<input type="file" multiple accept="image/*" ref={postFileInputRef} onChange={handlePostImageUpload} className="hidden" /></div></div>
                 </div>
                 <div className="p-5 border-t border-slate-100"><button type="button" onClick={handleAddPost} disabled={!newPost.header.trim()} className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-xl uppercase tracking-widest disabled:opacity-40 transition-all">Publish 发布</button></div>
              </div>
@@ -587,7 +636,7 @@ export default function App() {
               <h3 className="text-xl font-black italic mb-2 tracking-tighter">{editModal.title}</h3><p className="text-[10px] text-slate-400 font-bold mb-8 uppercase tracking-widest italic">Audit Decision</p>
               <form onSubmit={executeEditAction} className="space-y-6">
                 {(['add_item', 'add_category', 'edit_item_full', 'rename_category', 'add_timeline_node', 'edit_timeline'].includes(editModal.type)) && (<div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 italic">描述名称 / Name</label><input autoFocus type="text" value={editModal.name || ''} onChange={e => setEditModal({...editModal, name: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl p-5 text-[16px] font-bold focus:ring-slate-900 outline-none shadow-inner" placeholder="输入名称" required /></div>)}
-                {(['total_budget', 'add_item', 'edit_item_full'].includes(editModal.type)) && (<div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 italic">数额 / Plan (¥)</label><div className="relative font-mono font-black"><span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300">¥</span><input type="number" value={editModal.val1 === 0 ? '' : editModal.val1} onChange={e => setEditModal({...editModal, val1: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl p-5 pl-10 text-[16px] font-black focus:ring-slate-900 outline-none shadow-inner" placeholder="0" required /></div></div>)}
+                {(['total_budget', 'add_item', 'edit_item_full'].includes(editModal.type)) && (<div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 italic">数额 / Plan (¥)</label><div className="relative font-mono font-black"><span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300">¥</span><input type="number" value={(editModal.type === 'edit_item_full' ? editModal.val1 : (editModal.val1 === 0 ? '' : editModal.val1))} onChange={e => setEditModal({...editModal, val1: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl p-5 pl-10 text-[16px] font-black focus:ring-slate-900 outline-none shadow-inner" placeholder="0" required /></div></div>)}
                 {editModal.type === 'edit_item_full' && (<div className="space-y-2 animate-in slide-in-from-top-2"><label className="text-[9px] font-black text-sky-400 uppercase tracking-widest pl-1 italic">实际支付 / Actual (¥)</label><div className="relative font-mono font-black"><span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300">¥</span><input type="number" value={editModal.val2 === 0 ? '' : editModal.val2} onChange={e => setEditModal({...editModal, val2: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl p-5 pl-10 text-[16px] font-black focus:ring-sky-500 outline-none shadow-inner" placeholder="0" /></div></div>)}
                 {(['edit_timeline', 'add_timeline_node'].includes(editModal.type)) && (<div className="space-y-2 animate-in slide-in-from-top-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 italic">节点日期 / Date</label><input type="date" value={editModal.val1 || ''} onChange={e => setEditModal({...editModal, val1: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl p-5 text-[16px] font-black outline-none focus:ring-slate-900 shadow-inner" required /></div>)}
                 <div className="flex gap-3 pt-2"><button type="button" onClick={() => setEditModal(null)} className="flex-1 bg-slate-100 text-slate-400 text-xs font-black py-5 rounded-3xl uppercase active:scale-95">Cancel</button><button type="submit" className="flex-1 bg-slate-900 text-white text-xs font-black py-5 rounded-3xl shadow-xl uppercase active:scale-95">Confirm</button></div>
